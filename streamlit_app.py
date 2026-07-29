@@ -11,7 +11,6 @@ from datetime import datetime
 os.environ["ONNXRUNTIME_EXECUTION_PROVIDERS"] = "CPUExecutionProvider"
 
 import streamlit as st
-import numpy as np
 from PIL import Image
 from rembg import remove, new_session
 
@@ -31,16 +30,17 @@ st.markdown("""
         border-radius: 1rem;
         text-align: center;
         margin-bottom: 2rem;
-        cursor: pointer;
     }
     .main-header h1 {
         color: white !important;
         font-weight: 900 !important;
         margin: 0 !important;
+        font-size: 2.5rem !important;
     }
     .main-header p {
         color: rgba(255,255,255,0.85) !important;
         margin: 0.5rem 0 0 0 !important;
+        font-size: 1rem !important;
     }
     .stButton>button {
         background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
@@ -53,28 +53,26 @@ st.markdown("""
     .stButton>button:hover {
         opacity: 0.9;
     }
-    .download-btn {
-        background: linear-gradient(135deg, #22c55e, #16a34a) !important;
-    }
-    /* 隐藏文件上传器样式，使其覆盖在 header 上 */
-    .invisible-uploader {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        cursor: pointer;
-        z-index: 999;
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Cache model session - 使用 u2net 模型，更轻量适合 Streamlit Cloud 1GB 限制
+# Header
+st.markdown("""
+<div class="main-header">
+    <h1>PixelCraft</h1>
+    <p>AI 驱动的智能抠图工具 | 批量处理 | 自由换背景 | 一键下载</p>
+</div>
+""", unsafe_allow_html=True)
+
+
+# Cache model session
 @st.cache_resource
 def get_session():
-    st.info("正在加载 AI 模型，请稍候...")
-    return new_session(model_name="u2net")
+    try:
+        return new_session(model_name="u2net")
+    except Exception as e:
+        st.error(f"模型加载失败: {e}")
+        raise
 
 
 def remove_bg(img):
@@ -95,25 +93,37 @@ def hex_to_rgb(hex_color):
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-# 使用 session_state 存储上传的文件，使 header 点击也能触发上传
-if "uploaded_file" not in st.session_state:
-    st.session_state.uploaded_file = None
+def apply_bg(removed, bg_color, output_format):
+    """Apply background color to removed image."""
+    if bg_color != "transparent":
+        bg_rgb = hex_to_rgb(bg_color)
+        new_bg = Image.new("RGBA", removed.size, bg_rgb + (255,))
+        result = Image.alpha_composite(new_bg, removed)
+        if output_format == "JPEG":
+            result = result.convert("RGB")
+    else:
+        result = removed
+    return result
 
-# 可点击的 Header - 通过隐藏的 file_uploader 实现
-# 用一个列布局来放置 header 和隐藏的上传器
-header_col1, header_col2 = st.columns([1, 1])
 
-with header_col1:
-    st.markdown("""
-    <div class="main-header">
-        <h1>PixelCraft</h1>
-        <p>AI 驱动的智能抠图工具 | 批量处理 | 自由换背景 | 一键下载</p>
-    </div>
-    """, unsafe_allow_html=True)
+def save_image(result, output_format):
+    """Save image to buffer, return (buf, mime, ext)."""
+    buf = io.BytesIO()
+    if output_format == "JPEG":
+        result.convert("RGB").save(buf, format="JPEG", quality=95)
+        mime = "image/jpeg"
+        ext = "jpg"
+    elif output_format == "WEBP":
+        result.save(buf, format="WEBP", quality=95)
+        mime = "image/webp"
+        ext = "webp"
+    else:
+        result.save(buf, format="PNG")
+        mime = "image/png"
+        ext = "png"
+    buf.seek(0)
+    return buf, mime, ext
 
-# 用一个不可见的上传器放在 header 区域
-# 实际上 Streamlit 不支持直接在 HTML 上点击上传，我们用 button 来替代
-# 在 header 下面放一个醒目的上传按钮
 
 # Sidebar settings
 with st.sidebar:
@@ -151,7 +161,7 @@ tab_single, tab_batch = st.tabs(["📷 单张处理", "📁 批量处理"])
 # Single image tab
 with tab_single:
     uploaded_file = st.file_uploader(
-        "上传图片",
+        "上传图片（点击或拖拽）",
         type=["png", "jpg", "jpeg", "webp", "bmp", "tiff"],
         help="支持 PNG / JPG / WEBP / BMP / TIFF",
         key="single_upload",
@@ -170,34 +180,11 @@ with tab_single:
                 st.subheader("抠图结果")
                 with st.spinner("AI 正在抠图..."):
                     removed = remove_bg(img)
-
-                    if bg_color != "transparent":
-                        bg_rgb = hex_to_rgb(bg_color)
-                        new_bg = Image.new("RGBA", removed.size, bg_rgb + (255,))
-                        result = Image.alpha_composite(new_bg, removed)
-                        if output_format == "JPEG":
-                            result = result.convert("RGB")
-                    else:
-                        result = removed
+                    result = apply_bg(removed, bg_color, output_format)
 
                 st.image(result, use_container_width=True)
 
-                # Download
-                buf = io.BytesIO()
-                if output_format == "JPEG":
-                    result.convert("RGB").save(buf, format="JPEG", quality=95)
-                    mime = "image/jpeg"
-                    ext = "jpg"
-                elif output_format == "WEBP":
-                    result.save(buf, format="WEBP", quality=95)
-                    mime = "image/webp"
-                    ext = "webp"
-                else:
-                    result.save(buf, format="PNG")
-                    mime = "image/png"
-                    ext = "png"
-                buf.seek(0)
-
+                buf, mime, ext = save_image(result, output_format)
                 st.download_button(
                     label="⬇️ 下载结果",
                     data=buf,
@@ -238,20 +225,10 @@ with tab_batch:
                     try:
                         img = Image.open(f).convert("RGBA")
                         removed = remove_bg(img)
+                        result = apply_bg(removed, bg_color, "PNG")
 
-                        if bg_color != "transparent":
-                            bg_rgb = hex_to_rgb(bg_color)
-                            new_bg = Image.new("RGBA", removed.size, bg_rgb + (255,))
-                            result = Image.alpha_composite(new_bg, removed).convert("RGB")
-                        else:
-                            result = removed
-
-                        # Save to zip
                         out_buf = io.BytesIO()
-                        if bg_color != "transparent":
-                            result.save(out_buf, format="PNG", quality=95)
-                        else:
-                            result.save(out_buf, format="PNG")
+                        result.save(out_buf, format="PNG")
                         out_buf.seek(0)
                         fname = f"{f.name.rsplit('.', 1)[0]}_cutout.png"
                         zf.writestr(fname, out_buf.getvalue())
@@ -270,10 +247,9 @@ with tab_batch:
             progress_bar.empty()
             status_text.empty()
 
-            # Show results
-            st.success(f"完成！成功 {sum(1 for r in results if '✅' in r['status'])}/{len(uploaded_files)} 张")
+            success_count = sum(1 for r in results if "✅" in r["status"])
+            st.success(f"完成！成功 {success_count}/{len(uploaded_files)} 张")
 
-            # Show previews (first 6)
             previews = [r for r in results if "preview" in r][:6]
             if previews:
                 cols = st.columns(min(3, len(previews)))
@@ -281,7 +257,6 @@ with tab_batch:
                     with cols[idx % 3]:
                         st.image(item["preview"], caption=item["filename"], use_container_width=True)
 
-            # Download zip
             zip_buf.seek(0)
             st.download_button(
                 label="⬇️ 下载全部 (ZIP)",
@@ -291,7 +266,6 @@ with tab_batch:
                 use_container_width=True,
             )
 
-            # Show summary table
             with st.expander("查看处理详情"):
                 for r in results:
                     st.write(f"{r['status']} - {r['filename']}")
