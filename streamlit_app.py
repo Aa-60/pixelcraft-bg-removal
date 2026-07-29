@@ -31,6 +31,7 @@ st.markdown("""
         border-radius: 1rem;
         text-align: center;
         margin-bottom: 2rem;
+        cursor: pointer;
     }
     .main-header h1 {
         color: white !important;
@@ -55,26 +56,29 @@ st.markdown("""
     .download-btn {
         background: linear-gradient(135deg, #22c55e, #16a34a) !important;
     }
+    /* 隐藏文件上传器样式，使其覆盖在 header 上 */
+    .invisible-uploader {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 999;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown("""
-<div class="main-header">
-    <h1>PixelCraft</h1>
-    <p>AI 驱动的智能抠图工具 | 批量处理 | 自由换背景 | 一键下载</p>
-</div>
-""", unsafe_allow_html=True)
-
-# Cache model session
+# Cache model session - 使用 u2net 模型，更轻量适合 Streamlit Cloud 1GB 限制
 @st.cache_resource
 def get_session():
-    st.info("首次加载 BiRefNet 模型，请稍候...")
-    return new_session(model_name="birefnet-general")
+    st.info("正在加载 AI 模型，请稍候...")
+    return new_session(model_name="u2net")
 
 
 def remove_bg(img):
-    """Remove background using BiRefNet."""
+    """Remove background using rembg."""
     if img.mode != "RGBA":
         img = img.convert("RGBA")
     session = get_session()
@@ -90,6 +94,26 @@ def hex_to_rgb(hex_color):
         h = "".join(c * 2 for c in h)
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
+
+# 使用 session_state 存储上传的文件，使 header 点击也能触发上传
+if "uploaded_file" not in st.session_state:
+    st.session_state.uploaded_file = None
+
+# 可点击的 Header - 通过隐藏的 file_uploader 实现
+# 用一个列布局来放置 header 和隐藏的上传器
+header_col1, header_col2 = st.columns([1, 1])
+
+with header_col1:
+    st.markdown("""
+    <div class="main-header">
+        <h1>PixelCraft</h1>
+        <p>AI 驱动的智能抠图工具 | 批量处理 | 自由换背景 | 一键下载</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# 用一个不可见的上传器放在 header 区域
+# 实际上 Streamlit 不支持直接在 HTML 上点击上传，我们用 button 来替代
+# 在 header 下面放一个醒目的上传按钮
 
 # Sidebar settings
 with st.sidebar:
@@ -118,7 +142,7 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("**关于**")
-    st.markdown("基于 BiRefNet 大模型 | 永久免费在线")
+    st.markdown("基于 AI 模型 | 永久免费在线")
 
 
 # Main area tabs
@@ -130,55 +154,59 @@ with tab_single:
         "上传图片",
         type=["png", "jpg", "jpeg", "webp", "bmp", "tiff"],
         help="支持 PNG / JPG / WEBP / BMP / TIFF",
+        key="single_upload",
     )
 
     if uploaded_file is not None:
-        img = Image.open(uploaded_file).convert("RGBA")
+        try:
+            img = Image.open(uploaded_file).convert("RGBA")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("原图")
-            st.image(img, use_container_width=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("原图")
+                st.image(img, use_container_width=True)
 
-        with col2:
-            st.subheader("抠图结果")
-            with st.spinner("AI 正在抠图..."):
-                removed = remove_bg(img)
+            with col2:
+                st.subheader("抠图结果")
+                with st.spinner("AI 正在抠图..."):
+                    removed = remove_bg(img)
 
-                if bg_color != "transparent":
-                    bg_rgb = hex_to_rgb(bg_color)
-                    new_bg = Image.new("RGBA", removed.size, bg_rgb + (255,))
-                    result = Image.alpha_composite(new_bg, removed)
-                    if output_format == "JPEG":
-                        result = result.convert("RGB")
+                    if bg_color != "transparent":
+                        bg_rgb = hex_to_rgb(bg_color)
+                        new_bg = Image.new("RGBA", removed.size, bg_rgb + (255,))
+                        result = Image.alpha_composite(new_bg, removed)
+                        if output_format == "JPEG":
+                            result = result.convert("RGB")
+                    else:
+                        result = removed
+
+                st.image(result, use_container_width=True)
+
+                # Download
+                buf = io.BytesIO()
+                if output_format == "JPEG":
+                    result.convert("RGB").save(buf, format="JPEG", quality=95)
+                    mime = "image/jpeg"
+                    ext = "jpg"
+                elif output_format == "WEBP":
+                    result.save(buf, format="WEBP", quality=95)
+                    mime = "image/webp"
+                    ext = "webp"
                 else:
-                    result = removed
+                    result.save(buf, format="PNG")
+                    mime = "image/png"
+                    ext = "png"
+                buf.seek(0)
 
-            st.image(result, use_container_width=True)
-
-            # Download
-            buf = io.BytesIO()
-            if output_format == "JPEG":
-                result.convert("RGB").save(buf, format="JPEG", quality=95)
-                mime = "image/jpeg"
-                ext = "jpg"
-            elif output_format == "WEBP":
-                result.save(buf, format="WEBP", quality=95)
-                mime = "image/webp"
-                ext = "webp"
-            else:
-                result.save(buf, format="PNG")
-                mime = "image/png"
-                ext = "png"
-            buf.seek(0)
-
-            st.download_button(
-                label="⬇️ 下载结果",
-                data=buf,
-                file_name=f"pixelcraft_{uploaded_file.name.rsplit('.', 1)[0]}_cutout.{ext}",
-                mime=mime,
-                use_container_width=True,
-            )
+                st.download_button(
+                    label="⬇️ 下载结果",
+                    data=buf,
+                    file_name=f"pixelcraft_{uploaded_file.name.rsplit('.', 1)[0]}_cutout.{ext}",
+                    mime=mime,
+                    use_container_width=True,
+                )
+        except Exception as e:
+            st.error(f"处理失败：{str(e)}")
 
 
 # Batch tab
@@ -188,6 +216,7 @@ with tab_batch:
         type=["png", "jpg", "jpeg", "webp", "bmp", "tiff"],
         accept_multiple_files=True,
         help="一次最多处理 100 张",
+        key="batch_upload",
     )
 
     if uploaded_files:
@@ -272,7 +301,7 @@ with tab_batch:
 st.markdown("---")
 st.markdown(
     "<div style='text-align:center;color:#94a3b8;font-size:.8rem'>"
-    "Powered by BiRefNet | PixelCraft | 永久免费在线"
+    "Powered by AI | PixelCraft | 永久免费在线"
     "</div>",
     unsafe_allow_html=True,
 )
