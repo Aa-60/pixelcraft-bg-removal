@@ -1,0 +1,5 @@
+streamlit>=1.28
+rembg>=2.0.50
+onnxruntime
+Pillow
+numpy
