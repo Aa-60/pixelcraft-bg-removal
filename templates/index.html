@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelCraft - AI 智能抠图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#6366f1;--primary-dark:#4f46e5;--primary-light:#818cf8;--accent:#06b6d4;
+  --bg:#f0f2f5;--bg-card:#fff;--border:#e2e8f0;--border-light:#f1f5f9;
+  --text:#0f172a;--text-dim:#64748b;--text-light:#94a3b8;
+  --success:#22c55e;--error:#ef4444;--warning:#f59e0b;
+  --radius:16px;--radius-sm:10px;--radius-xs:6px;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06);
+  --shadow:0 4px 20px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.05);
+  --shadow-xl:0 20px 60px rgba(0,0,0,.15);
+  --glass:rgba(255,255,255,.7);--glass-border:rgba(255,255,255,.3);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ===== HERO HEADER ===== */
+.hero{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);padding:56px 24px 48px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(255,255,255,.15) 0%,transparent 50%),radial-gradient(ellipse at 80% 50%,rgba(6,182,212,.15) 0%,transparent 50%);pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:40px;background:var(--bg);border-radius:24px 24px 0 0}
+.hero h1{font-size:2.8rem;font-weight:900;color:#fff;letter-spacing:-.02em;margin-bottom:10px;position:relative;text-shadow:0 2px 20px rgba(0,0,0,.15)}
+.hero .subtitle{color:rgba(255,255,255,.85);font-size:1.1rem;font-weight:500;position:relative}
+.hero .features{display:flex;justify-content:center;gap:28px;margin-top:22px;position:relative;flex-wrap:wrap}
+.hero .feat{color:rgba(255,255,255,.9);font-size:.9rem;display:flex;align-items:center;gap:7px;font-weight:500}
+.hero .feat-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.6)}
+
+/* ===== MAIN CONTAINER ===== */
+.app{max-width:960px;margin:0 auto;padding:0 20px 60px;margin-top:-12px;position:relative;z-index:1}
+
+/* ===== CARD ===== */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;box-shadow:var(--shadow);margin-bottom:20px;transition:box-shadow .3s}
+.card-title{font-size:1.05rem;font-weight:700;margin-bottom:18px;color:var(--text);display:flex;align-items:center;gap:10px}
+.card-title .icon-dot{width:4px;height:20px;border-radius:4px;background:linear-gradient(180deg,var(--primary),var(--accent))}
+
+/* ===== UPLOAD ZONE ===== */
+.upload-zone{border:2.5px dashed var(--border);border-radius:var(--radius);padding:60px 24px;text-align:center;cursor:pointer;transition:all .3s ease;background:var(--border-light);position:relative;overflow:hidden}
+.upload-zone::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(99,102,241,.03),rgba(6,182,212,.03));opacity:0;transition:opacity .3s}
+.upload-zone:hover::before,.upload-zone.dragover::before{opacity:1}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--primary);transform:translateY(-1px);box-shadow:0 8px 30px rgba(99,102,241,.08)}
+.upload-zone .icon{width:64px;height:64px;margin:0 auto 16px;border-radius:16px;background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(6,182,212,.1));display:flex;align-items:center;justify-content:center;font-size:28px;transition:transform .3s}
+.upload-zone:hover .icon{transform:scale(1.08)}
+.upload-zone p{color:var(--text);font-size:1.05rem;font-weight:600;margin-bottom:6px}
+.upload-zone .hint{font-size:.82rem;color:var(--text-light);line-height:1.6}
+.upload-zone input{display:none}
+
+/* ===== CONTROLS ===== */
+.controls-row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-top:20px}
+.control-group{min-width:160px}
+.control-group label{display:block;font-size:.8rem;font-weight:700;color:var(--text-dim);margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
+.control-group select{width:100%;padding:11px 14px;background:#f8fafc;border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:.9rem;outline:none;transition:all .2s;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.control-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
+
+/* ===== BG COLOR SELECTOR ===== */
+.bg-color-bar{display:flex;align-items:center;gap:14px;margin-top:20px;flex-wrap:wrap;padding:16px 20px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid var(--border-light)}
+.bg-color-bar .bar-label{font-size:.88rem;font-weight:700;color:var(--text-dim);margin-right:2px;white-space:nowrap}
+.bg-swatch{width:44px;height:44px;border-radius:50%;cursor:pointer;border:3.5px solid transparent;transition:all .2s ease;position:relative;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.bg-swatch:hover{transform:scale(1.15);box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.bg-swatch.active{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.2),0 4px 14px rgba(0,0,0,.12)}
+.bg-swatch.swatch-transparent{background:repeating-conic-gradient(#e2e8f0 0% 25%,#fff 0% 50%) 50%/14px 14px}
+.bg-swatch.swatch-white{background:#fff;box-shadow:inset 0 0 0 1.5px #e2e8f0,0 2px 8px rgba(0,0,0,.1)}
+.bg-swatch.swatch-white.active{box-shadow:inset 0 0 0 1.5px #e2e8f0,0 0 0 3px rgba(99,102,241,.2)}
+.bg-swatch.swatch-black{background:#1e293b}
+.bg-swatch.swatch-red{background:#ef4444}
+.bg-swatch.swatch-green{background:#22c55e}
+.bg-swatch.swatch-blue{background:#3b82f6}
+.bg-swatch.swatch-custom{background:conic-gradient(#ef4444,#f59e0b,#22c55e,#06b6d4,#6366f1,#a855f7,#ef4444);position:relative}
+.bg-swatch.swatch-custom input[type="color"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:none;padding:0}
+
+/* ===== BUTTONS ===== */
+.btn{padding:13px 28px;border:none;border-radius:var(--radius-sm);font-size:.95rem;font-weight:700;cursor:pointer;transition:all .25s;display:inline-flex;align-items:center;gap:8px;letter-spacing:.01em}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(99,102,241,.4)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-success{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.3)}
+.btn-success:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(34,197,94,.4)}
+.btn-sm{padding:9px 18px;font-size:.85rem;border-radius:var(--radius-xs)}
+.btn-row{display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;align-items:center}
+
+/* ===== PROGRESS ===== */
+.progress-wrap{display:none;margin-top:18px}
+.progress-wrap.show{display:block}
+.progress-bar-bg{width:100%;height:10px;background:#e2e8f0;border-radius:99px;overflow:hidden;position:relative}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:99px;transition:width .3s ease;width:0%}
+.progress-status{font-size:.85rem;color:var(--text-dim);margin-top:8px;font-weight:500}
+
+/* ===== RESULT GRID ===== */
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:18px}
+.result-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:all .25s;box-shadow:var(--shadow-sm)}
+.result-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px)}
+.result-card .img-wrap{height:260px;display:flex;position:relative;overflow:hidden}
+.result-card .img-wrap .half{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:8px}
+.result-card .img-wrap .half img{max-width:100%;max-height:100%;object-fit:contain}
+.result-card .img-wrap .divider{position:absolute;left:50%;top:12px;bottom:12px;width:2px;background:var(--primary);z-index:2;opacity:.4;border-radius:1px}
+.result-card .img-wrap .tag{position:absolute;top:10px;padding:4px 12px;border-radius:99px;font-size:.72rem;font-weight:700;z-index:3;letter-spacing:.02em;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.tag-orig{left:10px;background:rgba(0,0,0,.45);color:rgba(255,255,255,.95)}
+.tag-result{right:10px;background:rgba(99,102,241,.7);color:#fff}
+.result-card .file-name{padding:12px 16px;font-size:.82rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-top:1px solid var(--border-light);font-weight:500}
+
+/* ===== MODAL ===== */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:300;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--bg-card);border-radius:var(--radius);max-width:92vw;width:800px;max-height:92vh;overflow:hidden;box-shadow:var(--shadow-xl);display:flex;flex-direction:column;animation:modalIn .25s ease}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-box .modal-preview{flex:1;display:flex;align-items:center;justify-content:center;min-height:350px;padding:28px;overflow:hidden;position:relative}
+.modal-box .modal-toolbar{display:flex;align-items:center;gap:16px;padding:18px 24px;border-top:1px solid var(--border-light);flex-wrap:wrap;justify-content:center;background:#fafbfc}
+.modal-close{position:fixed;top:20px;right:20px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.95);border:none;color:var(--text);font-size:1.3rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:301;box-shadow:var(--shadow);transition:all .2s}
+.modal-close:hover{background:var(--error);color:#fff;transform:scale(1.08)}
+.modal-label{position:absolute;top:18px;left:18px;background:rgba(15,23,42,.65);padding:5px 16px;border-radius:99px;font-size:.82rem;font-weight:700;color:#fff;z-index:2;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+
+/* ===== TOAST ===== */
+.toast{position:fixed;top:24px;right:24px;z-index:400;padding:14px 24px;border-radius:var(--radius-sm);color:#fff;font-weight:600;font-size:.9rem;transform:translateX(140%);transition:transform .4s cubic-bezier(.16,1,.3,1);box-shadow:var(--shadow-lg);backdrop-filter:blur(8px)}
+.toast.show{transform:translateX(0)}.toast.error{background:rgba(239,68,68,.92)}.toast.success{background:rgba(34,197,94,.92)}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:768px){
+  .hero{padding:36px 16px 36px}
+  .hero h1{font-size:2rem}
+  .hero .subtitle{font-size:.95rem}
+  .hero .features{gap:14px}
+  .app{padding:0 12px 40px}
+  .card{padding:20px}
+  .upload-zone{padding:40px 16px}
+  .upload-zone .icon{width:48px;height:48px;font-size:22px}
+  .result-grid{grid-template-columns:1fr}
+  .result-card .img-wrap{height:200px}
+  .modal-box{max-width:96vw;width:100%}
+  .bg-swatch{width:38px;height:38px}
+  .bg-color-bar{gap:10px;padding:12px 14px}
+}
+
+/* ===== MODAL COMPARE ===== */
+.modal-view-toggle{display:flex;gap:0;padding:0 24px;border-bottom:1px solid var(--border-light)}
+.toggle-btn{padding:12px 20px;border:none;background:none;font-size:.9rem;font-weight:600;color:var(--text-dim);cursor:pointer;border-bottom:2.5px solid transparent;transition:all .2s}
+.toggle-btn:hover{color:var(--text)}
+.toggle-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+.compare-view{display:flex !important;align-items:stretch !important}
+.compare-side{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;padding:16px;min-height:300px}
+.compare-side .modal-label{position:absolute;top:12px;left:12px}
+.compare-img{max-width:100%;max-height:55vh;object-fit:contain;border-radius:8px}
+.compare-divider{width:2px;background:linear-gradient(180deg,transparent,var(--primary),transparent);flex-shrink:0}
+#modal-orig-img{display:none}
+#modal-orig-img.loaded{display:block}
+.result-only-view{display:none}
+.result-only-view.show{display:flex}
+
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>PixelCraft</h1>
+  <div class="subtitle">AI 驱动的智能抠图工具，秒级处理，批量下载</div>
+  <div class="features">
+    <span class="feat"><span class="feat-dot"></span>批量处理</span>
+    <span class="feat"><span class="feat-dot"></span>自由换背景</span>
+    <span class="feat"><span class="feat-dot"></span>多格式导出</span>
+    <span class="feat"><span class="feat-dot"></span>一键下载</span>
+  </div>
+</div>
+
+<div class="app">
+  <!-- UPLOAD CARD -->
+  <div class="card">
+    <div class="card-title"><span class="icon-dot"></span>上传图片</div>
+    <div class="upload-zone" id="upload-zone">
+      <div class="icon">&#128228;</div>
+      <p>拖拽图片到此处，或点击选择文件</p>
+      <div class="hint">支持 PNG / JPG / WEBP / BMP / TIFF，一次最多处理 100 张</div>
+      <input type="file" accept="image/*" id="file-input" multiple>
+    </div>
+
+    <div class="controls-row">
+      <div class="control-group" style="max-width:180px">
+        <label>输出格式</label>
+        <select id="output-format">
+          <option value="PNG" selected>PNG（透明背景）</option>
+          <option value="JPEG">JPG</option>
+          <option value="WEBP">WEBP</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="bg-color-bar" id="bg-color-bar">
+      <span class="bar-label">背景颜色</span>
+      <div class="bg-swatch swatch-transparent active" data-bg="transparent" title="透明"></div>
+      <div class="bg-swatch swatch-white" data-bg="#FFFFFF" title="白色"></div>
+      <div class="bg-swatch swatch-black" data-bg="#000000" title="黑色"></div>
+      <div class="bg-swatch swatch-red" data-bg="#ef4444" title="红色"></div>
+      <div class="bg-swatch swatch-green" data-bg="#22c55e" title="绿色"></div>
+      <div class="bg-swatch swatch-blue" data-bg="#3b82f6" title="蓝色"></div>
+      <div class="bg-swatch swatch-custom" title="自定义颜色">
+        <input type="color" id="custom-color-input" value="#f59e0b">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-start" disabled>&#9654; 开始处理</button>
+      <span id="file-count" style="font-size:.9rem;color:var(--text-dim);font-weight:500"></span>
+    </div>
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-bar"></div></div>
+      <div class="progress-status" id="progress-status"></div>
+    </div>
+  </div>
+
+  <!-- RESULTS CARD -->
+  <div class="card" id="result-section" style="display:none">
+    <div class="card-title"><span class="icon-dot"></span>处理结果</div>
+    <div style="font-size:.88rem;color:var(--text-dim);margin-bottom:4px">显示前 10 张预览，点击可查看前后对比大图</div>
+    <div class="result-grid" id="result-grid"></div>
+    <div class="btn-row" id="btn-download-all-row" style="display:none">
+      <button class="btn btn-success" id="btn-download-zip">&#11015; 下载全部 (ZIP)</button>
+      <span id="result-summary" style="font-size:.88rem;color:var(--text-dim);font-weight:500"></span>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <button class="modal-close" id="modal-close">&times;</button>
+  <div class="modal-box">
+    <!-- View toggle -->
+    <div class="modal-view-toggle">
+      <button class="toggle-btn active" id="toggle-compare" data-view="compare">前后对比</button>
+      <button class="toggle-btn" id="toggle-result" data-view="result">仅看结果</button>
+    </div>
+    <!-- Compare view: side by side -->
+    <div class="modal-preview compare-view" id="modal-compare-area">
+      <div class="compare-side">
+        <span class="modal-label">原图</span>
+        <img id="modal-orig-img" class="compare-img">
+      </div>
+      <div class="compare-divider"></div>
+      <div class="compare-side" id="modal-result-side">
+        <span class="modal-label">抠图结果</span>
+        <canvas id="modal-canvas"></canvas>
+      </div>
+    </div>
+    <!-- Result only view -->
+    <div class="modal-preview result-only-view" id="modal-result-only-area" style="display:none">
+      <span class="modal-label">抠图结果</span>
+      <canvas id="modal-canvas2"></canvas>
+    </div>
+    <div class="modal-toolbar">
+      <div class="bg-color-bar" id="modal-bg-bar" style="margin:0;border:none;background:transparent;padding:0">
+        <span class="bar-label">背景</span>
+        <div class="bg-swatch swatch-transparent active" data-bg="transparent" title="透明"></div>
+        <div class="bg-swatch swatch-white" data-bg="#FFFFFF" title="白色"></div>
+        <div class="bg-swatch swatch-black" data-bg="#000000" title="黑色"></div>
+        <div class="bg-swatch swatch-red" data-bg="#ef4444" title="红色"></div>
+        <div class="bg-swatch swatch-green" data-bg="#22c55e" title="绿色"></div>
+        <div class="bg-swatch swatch-blue" data-bg="#3b82f6" title="蓝色"></div>
+        <div class="bg-swatch swatch-custom" title="自定义颜色">
+          <input type="color" id="modal-custom-color" value="#f59e0b">
+        </div>
+      </div>
+      <button class="btn btn-success btn-sm" id="modal-download">&#11015; 下载此图</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let selectedFiles=[],batchZipData=null,batchResults=[],currentBgColor='transparent',modalImg=null,modalFilename='';
+function showToast(msg,type='error'){const el=document.getElementById('toast');el.textContent=msg;el.className='toast '+type+' show';setTimeout(()=>el.classList.remove('show'),3500)}
+
+// Upload
+const uploadZone=document.getElementById('upload-zone'),fileInput=document.getElementById('file-input');
+uploadZone.addEventListener('click',()=>fileInput.click());
+uploadZone.addEventListener('dragover',e=>{e.preventDefault();uploadZone.classList.add('dragover')});
+uploadZone.addEventListener('dragleave',()=>uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop',e=>{e.preventDefault();uploadZone.classList.remove('dragover');handleFiles(e.dataTransfer.files)});
+fileInput.addEventListener('change',e=>{if(e.target.files.length)handleFiles(e.target.files)});
+
+function handleFiles(files){
+  selectedFiles=Array.from(files).slice(0,100);
+  document.getElementById('file-count').textContent='已选择 '+selectedFiles.length+' 张图片';
+  document.getElementById('btn-start').disabled=false;
+  document.getElementById('result-section').style.display='none';
+  document.getElementById('progress-wrap').classList.remove('show');
+}
+
+// BG color selector (main bar)
+const swatches=document.querySelectorAll('#bg-color-bar .bg-swatch');
+const customInput=document.getElementById('custom-color-input');
+swatches.forEach(s=>{
+  if(!s.classList.contains('swatch-custom')){
+    s.addEventListener('click',()=>{
+      swatches.forEach(x=>x.classList.remove('active'));s.classList.add('active');
+      currentBgColor=s.dataset.bg;updatePreviewBackgrounds();
+    });
+  }
+});
+customInput.addEventListener('input',e=>{
+  swatches.forEach(x=>x.classList.remove('active'));customInput.parentElement.classList.add('active');
+  currentBgColor=e.target.value;updatePreviewBackgrounds();
+});
+
+function updatePreviewBackgrounds(){
+  document.querySelectorAll('.result-half').forEach(h=>{
+    h.style.background=currentBgColor==='transparent'
+      ?'repeating-conic-gradient(#e2e8f0 0% 25%,#fff 0% 50%) 50%/14px 14px'
+      :currentBgColor;
+  });
+  if(modalImg){renderModalCanvas();renderModalCanvas2()}
+}
+
+// Batch process
+async function processBatch(){
+  if(!selectedFiles.length)return;
+  const btn=document.getElementById('btn-start');btn.disabled=true;btn.innerHTML='<span style="display:inline-block;animation:spin 1s linear infinite">&#9881;</span> 处理中...';
+  const bar=document.getElementById('progress-bar'),stat=document.getElementById('progress-status');
+  document.getElementById('progress-wrap').classList.add('show');bar.style.width='0%';
+  stat.textContent='正在上传第 1 / '+selectedFiles.length+' 张...';
+
+  const fd=new FormData();
+  selectedFiles.forEach(f=>fd.append('images',f));
+  fd.append('output_format',document.getElementById('output-format').value);
+
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST','/api/batch-remove-bg');
+  xhr.upload.onprogress=(e)=>{
+    if(e.lengthComputable){
+      const pct=Math.round(e.loaded/e.total*90);
+      bar.style.width=pct+'%';
+      stat.textContent='正在上传... ' + pct + '%';
+    }
+  };
+  xhr.onload=function(){
+    bar.style.width='100%';
+    try{
+      const data=JSON.parse(xhr.responseText);
+      if(data.success){
+        stat.textContent='完成！共处理 '+data.total+' 张';
+        batchResults=data.preview;batchZipData=data.zip_data;
+        renderResults(data.preview);
+        document.getElementById('result-section').style.display='block';
+        document.getElementById('btn-download-all-row').style.display='flex';
+        document.getElementById('result-summary').textContent='共 '+data.total+' 张，已选背景：'+(currentBgColor==='transparent'?'透明':currentBgColor);
+      }else showToast(data.error||'批量处理失败')
+    }catch(e){showToast('解析响应失败')}
+    btn.disabled=false;btn.innerHTML='&#9654; 开始处理';
+  };
+  xhr.onerror=()=>{showToast('网络错误');btn.disabled=false;btn.innerHTML='&#9654; 开始处理'};
+  xhr.send(fd);
+}
+document.getElementById('btn-start').addEventListener('click',processBatch);
+
+function renderResults(preview){
+  const grid=document.getElementById('result-grid');grid.innerHTML='';
+  const bgStyle=currentBgColor==='transparent'?'background:repeating-conic-gradient(#e2e8f0 0% 25%,#fff 0% 50%) 50%/14px 14px':'background:'+currentBgColor;
+  preview.forEach((item,idx)=>{
+    if(item.status==='ok'){
+      const card=document.createElement('div');card.className='result-card';
+      card.innerHTML='<div class="img-wrap"><div class="half" style="background:#fff"><img src="'+item.orig+'"></div><div class="divider"></div><div class="half result-half" style="'+bgStyle+'"><img src="'+item.result+'"></div><span class="tag tag-orig">原图</span><span class="tag tag-result">结果</span></div><div class="file-name">'+item.filename+'</div>';
+      card.addEventListener('click',()=>openModal(item,idx));grid.appendChild(card);
+    }else{
+      const card=document.createElement('div');card.className='result-card';
+      card.innerHTML='<div style="padding:20px;text-align:center;color:var(--error);font-size:.9rem;font-weight:500">'+item.filename+'<br><span style="font-size:.82rem">处理失败</span></div>';
+      grid.appendChild(card);
+    }
+  });
+}
+
+// Modal
+const modal=document.getElementById('modal');
+const modalCanvas=document.getElementById('modal-canvas'),modalCtx=modalCanvas.getContext('2d');
+const modalCanvas2=document.getElementById('modal-canvas2'),modalCtx2=modalCanvas2.getContext('2d');
+const modalOrigImg=document.getElementById('modal-orig-img');
+const compareArea=document.getElementById('modal-compare-area');
+const resultOnlyArea=document.getElementById('modal-result-only-area');
+let modalOrigSrc='',modalResultSrc='';
+
+function openModal(item){
+  modalFilename=item.filename;
+  modalOrigSrc=item.orig;
+  const fullSrc=item.result_full||item.result;
+  modalResultSrc=fullSrc;
+  modalImg=new Image();modalImg.crossOrigin='anonymous';
+  modalImg.onload=()=>{renderModalCanvas();renderModalCanvas2();modal.classList.add('show')};
+  modalImg.src=fullSrc;
+  modalOrigImg.onload=()=>modalOrigImg.classList.add('loaded');
+  modalOrigImg.src=item.orig;
+  setModalView('compare');
+}
+
+function setModalView(view){
+  const btns=document.querySelectorAll('.toggle-btn');
+  btns.forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  if(view==='compare'){
+    compareArea.style.display='flex';
+    resultOnlyArea.classList.remove('show');
+  }else{
+    compareArea.style.display='none';
+    resultOnlyArea.classList.add('show');
+    renderModalCanvas2();
+  }
+}
+
+document.getElementById('toggle-compare').addEventListener('click',e=>{e.stopPropagation();setModalView('compare')});
+document.getElementById('toggle-result').addEventListener('click',e=>{e.stopPropagation();setModalView('result')});
+
+function renderModalCanvas(){
+  if(!modalImg||!modalImg.complete)return;
+  const maxW=window.innerWidth*.42,maxH=window.innerHeight*.55;
+  let w=modalImg.naturalWidth,h=modalImg.naturalHeight;
+  const scale=Math.min(maxW/w,maxH/h,1);w=Math.round(w*scale);h=Math.round(h*scale);
+  modalCanvas.width=w;modalCanvas.height=h;modalCtx.clearRect(0,0,w,h);
+  if(currentBgColor!=='transparent'){modalCtx.fillStyle=currentBgColor;modalCtx.fillRect(0,0,w,h)}
+  modalCtx.drawImage(modalImg,0,0,w,h);
+  const resultSide=document.getElementById('modal-result-side');
+  resultSide.style.background=currentBgColor==='transparent'?'repeating-conic-gradient(#e2e8f0 0% 25%,#fff 0% 50%) 50%/14px 14px':currentBgColor;
+}
+
+function renderModalCanvas2(){
+  if(!modalImg||!modalImg.complete)return;
+  const maxW=window.innerWidth*.85,maxH=window.innerHeight*.62;
+  let w=modalImg.naturalWidth,h=modalImg.naturalHeight;
+  const scale=Math.min(maxW/w,maxH/h,1);w=Math.round(w*scale);h=Math.round(h*scale);
+  modalCanvas2.width=w;modalCanvas2.height=h;modalCtx2.clearRect(0,0,w,h);
+  if(currentBgColor!=='transparent'){modalCtx2.fillStyle=currentBgColor;modalCtx2.fillRect(0,0,w,h)}
+  modalCtx2.drawImage(modalImg,0,0,w,h);
+  resultOnlyArea.style.background=currentBgColor==='transparent'?'repeating-conic-gradient(#e2e8f0 0% 25%,#fff 0% 50%) 50%/16px 16px':currentBgColor;
+}
+document.getElementById('modal-close').addEventListener('click',()=>{modal.classList.remove('show');modalImg=null});
+modal.addEventListener('click',e=>{if(e.target===modal){modal.classList.remove('show');modalImg=null}});
+
+// Modal BG bar
+document.querySelectorAll('#modal-bg-bar .bg-swatch').forEach(s=>{
+  if(!s.classList.contains('swatch-custom')){
+    s.addEventListener('click',e=>{
+      e.stopPropagation();
+      document.querySelectorAll('.bg-swatch').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.bg-swatch[data-bg="'+s.dataset.bg+'"]').forEach(x=>x.classList.add('active'));
+      currentBgColor=s.dataset.bg;updatePreviewBackgrounds();
+    });
+  }
+});
+const modalCustomInput=document.getElementById('modal-custom-color');
+modalCustomInput.addEventListener('input',e=>{
+  e.stopPropagation();document.querySelectorAll('.bg-swatch').forEach(x=>x.classList.remove('active'));
+  modalCustomInput.parentElement.classList.add('active');customInput.parentElement.classList.add('active');
+  currentBgColor=e.target.value;customInput.value=e.target.value;updatePreviewBackgrounds();
+});
+
+// Modal download
+document.getElementById('modal-download').addEventListener('click',e=>{
+  e.stopPropagation();if(!modalImg)return;
+  const fmt=document.getElementById('output-format').value;
+  let mime,ext;if(fmt==='JPEG'){mime='image/jpeg';ext='jpg'}else if(fmt==='WEBP'){mime='image/webp';ext='webp'}else{mime='image/png';ext='png'}
+  const fc=document.createElement('canvas');fc.width=modalImg.naturalWidth;fc.height=modalImg.naturalHeight;
+  const fctx=fc.getContext('2d');
+  if(currentBgColor!=='transparent'||fmt==='JPEG'){fctx.fillStyle=currentBgColor==='transparent'?'#FFFFFF':currentBgColor;fctx.fillRect(0,0,fc.width,fc.height)}
+  fctx.drawImage(modalImg,0,0);
+  fc.toBlob(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=modalFilename.replace(/\.[^.]+$/,'')+'_cutout.'+ext;a.click();URL.revokeObjectURL(a.href)},mime,.95);
+});
+
+// Batch ZIP download
+document.getElementById('btn-download-zip').addEventListener('click',()=>{
+  if(!batchZipData)return;const b64=batchZipData.split(',')[1];
+  const blob=new Blob([Uint8Array.from(atob(b64),c=>c.charCodeAt(0))],{type:'application/zip'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pixelcraft_batch.zip';a.click();URL.revokeObjectURL(a.href);
+});
+
+// Add spin animation
+const styleEl=document.createElement('style');styleEl.textContent='@keyframes spin{to{transform:rotate(360deg)}}';document.head.appendChild(styleEl);
+</script>
+</body>
+</html>

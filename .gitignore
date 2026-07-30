@@ -1,0 +1,35 @@
+# Model files (too large for GitHub)
+models/
+*.onnx
+
+# Uploads / temp
+.uploads/
+uploads/
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local runtime files
+*.log
+tunnel.log
+当前网址.txt
+test_result.png
