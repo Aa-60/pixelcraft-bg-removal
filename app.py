@@ -204,8 +204,8 @@ def get_local_ip():
 
 
 def main():
-    port = 5000
-    host = "0.0.0.0"
+    port = int(os.environ.get("PORT", 7860))
+    host = os.environ.get("HOST", "0.0.0.0")
     for a in sys.argv[1:]:
         if a.startswith("--port="): port = int(a.split("=")[1])
         elif a.startswith("--host="): host = a.split("=")[1]
