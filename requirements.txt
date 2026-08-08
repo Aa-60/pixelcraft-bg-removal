@@ -1,4 +1,4 @@
-flask>=2.0
+streamlit>=1.30
 rembg>=2.0.50
 onnxruntime>=1.16
 Pillow>=9.0
