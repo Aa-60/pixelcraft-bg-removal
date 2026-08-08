@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: pixelcraft-bg-removal
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 7860
+      - key: PYTHON_VERSION
+        value: 3.10.11

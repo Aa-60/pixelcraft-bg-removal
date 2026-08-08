@@ -16,10 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create models directory (BiRefNet model auto-downloads on first run)
-RUN mkdir -p models
+RUN mkdir -p /app/models
 
-# Hugging Face Spaces requires port 7860
+# Port 7860
 ENV PORT=7860
 EXPOSE 7860
+
+# Volume for model persistence across restarts
+VOLUME /app/models
 
 CMD ["python", "app.py"]
